@@ -102,6 +102,78 @@ class GridRouter(BaseRouter):
             return None
 
 
+class GridRecycleRouter(BaseRouter):
+    """A router used to re-route a vehicle in a traffic light grid environment in ring.
+    written by YangX 2023.04.13
+
+    Usage
+    -----
+    See base class for usage example.
+    """
+
+    def choose_route(self, env):
+        """See parent class"""
+
+        def get_next(c_e, method):
+            """A function used to get the next edge due to current position and lane """
+            edge_direction = c_e[:-3] # top/bot/left/right
+            i,j = int(c_e[-3]), int(c_e[-1]) # get the index of current edge
+            n_e = None
+            if method=="r":
+                if edge_direction=="bot":n_e="left"+str(i)+"_"+str(j)
+                elif edge_direction=="right":n_e="bot"+str(i)+"_"+str(j+1)
+                elif edge_direction=="top":n_e="right"+str(i+1)+"_"+str(j-1)
+                else: n_e="top"+str(i-1)+"_"+str(j)
+
+            elif method=="l":
+                if edge_direction=="bot":n_e="right"+str(i+1)+"_"+str(j)
+                elif edge_direction=="right":n_e="top"+str(i)+"_"+str(j)
+                elif edge_direction=="top":n_e="left"+str(i)+"_"+str(j-1)
+                else:n_e="bot"+str(i-1)+"_"+str(j+1)
+            return n_e
+
+        def finish_the_travel(veh_id):
+            """A function to judge if the veh is finish its travel and move out the network"""
+            is_finish = False
+
+            c_e = env.k.vehicle.get_edge(veh_id)
+            edge_direction = c_e[:-3]  # top/bot/left/right
+
+            n, m = env.network.row_num, env.network.col_num  # get the network size
+            i, j = int(c_e[-3]), int(c_e[-1])
+
+            if edge_direction == "left" and i == 0:
+                is_finish = True
+            elif edge_direction == "right" and i == n:
+                is_finish = True
+            elif edge_direction == "top" and j == 0:
+                is_finish = True
+            elif edge_direction == "bot" and j == m:
+                is_finish = True
+            else: pass
+            return is_finish
+
+        if len(env.k.vehicle.get_route(self.veh_id)) == 0:
+            return None
+        elif env.k.vehicle.get_edge(self.veh_id) in env.k.vehicle.get_route(self.veh_id)\
+                and not finish_the_travel(self.veh_id):
+
+            current_edge = env.k.vehicle.get_edge(self.veh_id)
+            if env.k.vehicle.get_lane(self.veh_id) == 0:  # right-turn routes
+                next_edge = get_next(current_edge,method="r")
+                return [current_edge,next_edge]
+            elif env.k.vehicle.get_lane(self.veh_id) == 2:  # left-turn routes
+                next_edge = get_next(current_edge, method="l")
+                return [current_edge,next_edge]
+            else: # pass-through routes
+                if env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[-1]:
+                    return [current_edge]
+                else: return None
+
+        else:
+            return None
+
+
 class BayBridgeRouter(ContinuousRouter):
     """Assists in choosing routes in select cases for the Bay Bridge network.
 
