@@ -116,20 +116,27 @@ class GridRecycleRouter(BaseRouter):
 
         def get_next(c_e, method):
             """A function used to get the next edge due to current position and lane """
-            edge_direction = c_e[:-3] # top/bot/left/right
-            i,j = int(c_e[-3]), int(c_e[-1]) # get the index of current edge
+            edge_direction = c_e[:-3]  # top/bot/left/right
+            i, j = int(c_e[-3]), int(c_e[-1])  # get the index of current edge
             n_e = None
-            if method=="r":
+            if method == "r":
                 if edge_direction=="bot":n_e="left"+str(i)+"_"+str(j)
                 elif edge_direction=="right":n_e="bot"+str(i)+"_"+str(j+1)
                 elif edge_direction=="top":n_e="right"+str(i+1)+"_"+str(j-1)
                 else: n_e="top"+str(i-1)+"_"+str(j)
 
-            elif method=="l":
+            elif method == "l":
                 if edge_direction=="bot":n_e="right"+str(i+1)+"_"+str(j)
                 elif edge_direction=="right":n_e="top"+str(i)+"_"+str(j)
                 elif edge_direction=="top":n_e="left"+str(i)+"_"+str(j-1)
-                else:n_e="bot"+str(i-1)+"_"+str(j+1)
+                else: n_e = "bot" + str(i-1) + "_" + str(j+1)
+
+            elif method == "p":
+                if edge_direction=="bot":n_e=edge_direction+str(i)+"_"+str(j+1)
+                elif edge_direction=="right":n_e=edge_direction+str(i+1)+"_"+str(j)
+                elif edge_direction=="top":n_e=edge_direction+str(i)+"_"+str(j-1)
+                else: n_e = edge_direction + str(i-1) + "_" + str(j)
+
             return n_e
 
         def finish_the_travel(veh_id):
@@ -167,7 +174,8 @@ class GridRecycleRouter(BaseRouter):
                 return [current_edge,next_edge]
             else: # pass-through routes
                 if env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[-1]:
-                    return [current_edge]
+                    next_edge = get_next(current_edge, method="p")
+                    return [current_edge,next_edge]
                 else: return None
 
         else:
