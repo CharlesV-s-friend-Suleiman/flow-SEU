@@ -8,7 +8,7 @@ from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
 from flow.core.experiment import Experiment
 from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
-from flow.controllers import GridRouter
+from flow.controllers import GridRouter,GridRecycleRouter
 
 '''tools from workspace'''
 from utils import inflow_methods
@@ -26,7 +26,52 @@ num_cars_top = 20
 num_cars_bot = 20
 n_columns = 2
 n_rows = 3
-tl = TrafficLightParams()  # the light
+
+tl_logic = TrafficLightParams(baseline=False)
+phases = [{
+    # N-S go through
+    "duration": "31",
+    "minDur": "8",
+    "maxDur": "45",
+    "state": "GGGrGrrrGGGrGrrr"
+}, { # N-S go through yellow
+    "duration": "6",
+    "minDur": "3",
+    "maxDur": "6",
+    "state": "GyyrGrrrGyyrGrrr"
+}, {# N-S left turn
+    "duration": "20",
+    "minDur": "8",
+    "maxDur": "25",
+    "state": "GrrGGrrrGrrGGrrr"
+}, {# N-S left turn yellow
+    "duration": "6",
+    "minDur": "3",
+    "maxDur": "6",
+    "state": "GrryGrrrGrryGrrr"
+}, { # W-E go through
+    "duration": "31",
+    "minDur": "8",
+    "maxDur": "45",
+    "state": "GrrrGGGrGrrrGGGr"
+}, { # W-E go through yellow
+    "duration": "6",
+    "minDur": "3",
+    "maxDur": "6",
+    "state": "GrrrGyyrGrrrGyyr"
+}, {# W-E left turn
+    "duration": "20",
+    "minDur": "8",
+    "maxDur": "25",
+    "state": "GrrrGrrGGrrrGrrG"
+}, {# W-E left turn yellow
+    "duration": "6",
+    "minDur": "3",
+    "maxDur": "6",
+    "state": "GrrrGrryGrrrGrry"
+}]
+for center in range(n_columns*n_rows):
+    tl_logic.add('center'+str(center), phases=phases, programID='1')
 
 ADDITIONAL_NET_PARAMS = {
     # dictionary of traffic light grid array data
@@ -59,7 +104,8 @@ ADDITIONAL_NET_PARAMS = {
     "speed_limit": {
         "horizontal": 35,
         "vertical": 35
-    }
+    },
+    "traffic_lights": True
 }  # the net_params
 
 tot_cars = (num_cars_left + num_cars_right) * n_columns \
@@ -75,7 +121,7 @@ class SingleIntersectionNet(Network):
                  vehicles,
                  net_params,
                  initial_config=InitialConfig(),
-                 traffic_lights=tl
+                 traffic_lights=tl_logic
                  ):
         optional = ["tl_logic"]
 
@@ -154,7 +200,6 @@ class SingleIntersectionNet(Network):
             for i in range(self.row_num + 1):
                 routes[left_id] += ["left{}_{}".format(self.row_num - i, j)]
                 routes[right_id] += ["right{}_{}".format(i, j)]
-        print(routes)
         return routes
 
     def specify_types(self, net_params):
@@ -171,9 +216,11 @@ class SingleIntersectionNet(Network):
         return types
 
     def specify_connections(self, net_params):
+
         con_dict = {}
 
         def new_con(side, from_id, to_id, lane, signal_group):
+            """this method only for go through connections """
             return [{
                 "from": side + from_id,
                 "to": side + to_id,
@@ -183,26 +230,92 @@ class SingleIntersectionNet(Network):
             }]
 
         # build connections at each inner node
+        # build go through connection
         for i in range(self.row_num):
             for j in range(self.col_num):
                 node_id = "{}_{}".format(i, j)
                 right_node_id = "{}_{}".format(i, j + 1)
                 top_node_id = "{}_{}".format(i + 1, j)
 
+
                 conn = []
-                for lane in range(self.horizontal_lanes):
-                    conn += new_con("bot", node_id, right_node_id, lane, 1)
-                    conn += new_con("top", right_node_id, node_id, lane, 1)
-                for lane in range(self.vertical_lanes):
-                    conn += new_con("right", node_id, top_node_id, lane, 2)
-                    conn += new_con("left", top_node_id, node_id, lane, 2)
+
+                for lane in range(self.horizontal_lanes-1):
+                    conn += new_con("bot", node_id, right_node_id, lane, 1) # horizontal ->
+                    conn += new_con("top", right_node_id, node_id, lane, 1) # horizontal <-
+                    if lane == 0:
+                        # right lanes
+                        conn += [{
+                                    "from": "top"+right_node_id,
+                                    "to": "right"+top_node_id,
+                                    "fromLane": str(lane),
+                                    "toLane": str(lane),
+                                    "signal_group": 1
+                                    }]
+                        conn += [{
+                                    "from": "bot"+node_id,
+                                    "to": "left"+node_id,
+                                    "fromLane": str(lane),
+                                    "toLane": str(lane),
+                                    "signal_group": 1
+                                    }]
+                # left lanes
+                conn += [{
+                            "from": "top"+right_node_id,
+                            "to": "left"+node_id,
+                            "fromLane": str(self.horizontal_lanes-1),
+                            "toLane": str(self.horizontal_lanes-1),
+                            "signal_group": 1
+                            }]
+                conn += [{
+                            "from": "bot"+node_id,
+                            "to": "right"+top_node_id,
+                            "fromLane": str(self.horizontal_lanes-1),
+                            "toLane": str(self.horizontal_lanes-1),
+                            "signal_group": 1
+                            }]
+
+                for lane in range(self.vertical_lanes-1):
+                    conn += new_con("right", node_id, top_node_id, lane, 2)  # vectical /|\
+                    conn += new_con("left", top_node_id, node_id, lane, 2)  # vectical \|/
+                    if lane == 0:
+
+                        conn += [{
+                            "from": "right" + node_id,
+                            "to": "bot" + right_node_id,
+                            "fromLane": str(lane),
+                            "toLane": str(lane),
+                            "signal_group": 2
+                        }]
+                        conn += [{
+                            "from": "left" + top_node_id,
+                            "to": "top" + node_id,
+                            "fromLane": str(lane),
+                            "toLane": str(lane),
+                            "signal_group": 2
+                        }]
+
+                # left lanes
+                conn += [{
+                    "from": "right" + node_id,
+                    "to": "top" + node_id,
+                    "fromLane": str(self.vertical_lanes-1),
+                    "toLane": str(self.vertical_lanes-1),
+                    "signal_group": 2
+                }]
+                conn += [{
+                    "from": "left" + top_node_id,
+                    "to": "bot" + right_node_id,
+                    "fromLane": str(self.vertical_lanes-1),
+                    "toLane": str(self.vertical_lanes-1),
+                    "signal_group": 2
+                }]
 
                 node_id = "center{}".format(i * self.col_num + j)
                 con_dict[node_id] = conn
 
         return con_dict
 
-    """generate the inner nodes and outside nodes"""
     @property
     def _inner_nodes(self):
         node_type = "traffic_light" if self.use_traffic_lights else "priority"
@@ -216,7 +329,6 @@ class SingleIntersectionNet(Network):
                     "type": node_type,
                     "radius": self.inner_nodes_radius
                 }) # add node to nodes
-
         return nodes
 
     @property
@@ -278,7 +390,7 @@ class SingleIntersectionNet(Network):
                                   "vertical", "right")
                 edges += new_edge(index, node_index + self.col_num, node_index,
                                   "vertical", "left")
-
+        print(edges)
         return edges
 
     @property
@@ -419,14 +531,12 @@ class SingleIntersectionNet(Network):
         return sorted(mapping.items(), key=lambda x: x[0])
 
 
-"""three inner function for grid scenario"""
-
 
 
 vehs = VehicleParams()
 vehs.add(
     veh_id="human",
-    routing_controller=(GridRouter, {}),
+    routing_controller=(GridRecycleRouter, {}),
     car_following_params=SumoCarFollowingParams(
         min_gap=2.5,
         decel=7.5,  # avoid collisions at emergency stops
@@ -435,31 +545,8 @@ vehs.add(
 
 env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
 
-tl_logic = TrafficLightParams(baseline=False)
-phases = [{
-    "duration": "31",
-    "minDur": "8",
-    "maxDur": "45",
-    "state": "GrGrGrGrGrGr"
-}, {
-    "duration": "6",
-    "minDur": "3",
-    "maxDur": "6",
-    "state": "yryryryryryr"
-}, {
-    "duration": "31",
-    "minDur": "8",
-    "maxDur": "45",
-    "state": "rGrGrGrGrGrG"
-}, {
-    "duration": "6",
-    "minDur": "3",
-    "maxDur": "6",
-    "state": "ryryryryryry"
-}]
 
-'''adding tl in scenario'''
-tl_logic.add("center0", phases=phases, programID=1)
+
 
 """params using in simulation"""
 sim_params = SumoParams(sim_step=0.1, render=True, emission_path='data')
@@ -473,10 +560,10 @@ else:
         enter_speed=v_enter,
         add_net_params=ADDITIONAL_NET_PARAMS)
 
-nets = SingleIntersectionNet(name='fatih',
+'''nets = SingleIntersectionNet(name='fatih',
                                   vehicles=vehs,
                                   net_params=net_params,
-                                  traffic_lights=tl_logic)
+                                  traffic_lights=tl_logic)'''
 flow_params = dict(
     exp_tag='test_network',
     env_name=AccelEnv,
