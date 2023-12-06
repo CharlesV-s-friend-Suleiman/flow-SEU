@@ -560,10 +560,7 @@ else:
         enter_speed=v_enter,
         add_net_params=ADDITIONAL_NET_PARAMS)
 
-'''nets = SingleIntersectionNet(name='fatih',
-                                  vehicles=vehs,
-                                  net_params=net_params,
-                                  traffic_lights=tl_logic)'''
+
 flow_params = dict(
     exp_tag='test_network',
     env_name=AccelEnv,
@@ -574,7 +571,7 @@ flow_params = dict(
     net=net_params,
     veh=vehs,
     initial=initial_config,
-    tl=tl_logic
+    tls=tl_logic
 )
 
 
