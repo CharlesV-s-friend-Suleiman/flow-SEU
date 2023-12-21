@@ -53,7 +53,7 @@ def get_flow_params(col_num, row_num, additional_net_params):
         network-specific parameters used to generate the network
     """
     initial = InitialConfig(
-        spacing='custom', lanes_distribution=float('inf'), shuffle=True)
+        spacing='custom', lanes_distribution=float('inf'), shuffle=False)
 
     inflow = InFlows()
     outer_edges = gen_edges(col_num, row_num)
