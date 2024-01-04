@@ -10,7 +10,7 @@ from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
 from flow.controllers import GridRouter, GridRecycleRouter
 
 '''tools from workspace'''
-from utils import inflow_methods
+from utils import inflow_methods, route_tools
 
 # some hyper-params used in scenario
 USE_INFLOWS = True
@@ -181,6 +181,7 @@ class SingleIntersectionNet(Network):
         return self._inner_edges + self._outer_edges
 
     def specify_routes(self, net_params):
+        """The normal direct routes and a special route generated for the CAV."""
         routes = defaultdict(list)
 
         # build row routes (vehicles go from left to right and vice versa)
@@ -198,6 +199,12 @@ class SingleIntersectionNet(Network):
             for i in range(self.row_num + 1):
                 routes[left_id] += ["left{}_{}".format(self.row_num - i, j)]
                 routes[right_id] += ["right{}_{}".format(i, j)]
+
+        # build a per-generated route for the CAV
+        special_id = vehs.ids[-1]
+        edge_o, edge_d = "bot0_0", "bot{}_{}".format(self.row_num - 1, self.col_num)
+        routes[special_id] = route_tools.find_routes(edge_o, edge_d)
+
         return routes
 
     def specify_types(self, net_params):
@@ -387,7 +394,6 @@ class SingleIntersectionNet(Network):
                                   "vertical", "right")
                 edges += new_edge(index, node_index + self.col_num, node_index,
                                   "vertical", "left")
-        print(edges)
         return edges
 
     @property
