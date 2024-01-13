@@ -6,6 +6,8 @@ from flow.core.params import TrafficLightParams
 from collections import defaultdict
 import numpy as np
 from flow.utils import route_tools
+from flow.utils import inflow_methods
+import random
 
 ADDITIONAL_NET_PARAMS = {
     # dictionary of traffic light grid array data
@@ -174,6 +176,7 @@ class TrafficLightGridNetwork(Network):
 
     def specify_routes(self, net_params):
         """See parent class."""
+
         routes = defaultdict(list)
 
         # build row routes (vehicles go from left to right and vice versa)
@@ -735,9 +738,8 @@ class SingleIntersectionNet(Network):
                 right_node_id = "{}_{}".format(i, j + 1)
                 top_node_id = "{}_{}".format(i + 1, j)
 
-
                 conn = []
-
+                # pass through and right lanes
                 for lane in range(self.horizontal_lanes-1):
                     conn += new_con("bot", node_id, right_node_id, lane, 1) # horizontal ->
                     conn += new_con("top", right_node_id, node_id, lane, 1) # horizontal <-
@@ -758,18 +760,19 @@ class SingleIntersectionNet(Network):
                                     "signal_group": 1
                                     }]
                 # left lanes
-                conn += [{
+                for l in range(self.horizontal_lanes):
+                    conn += [{
                             "from": "top"+right_node_id,
                             "to": "left"+node_id,
                             "fromLane": str(self.horizontal_lanes-1),
-                            "toLane": str(self.horizontal_lanes-1),
+                            "toLane": str(l),
                             "signal_group": 1
                             }]
-                conn += [{
+                    conn += [{
                             "from": "bot"+node_id,
                             "to": "right"+top_node_id,
                             "fromLane": str(self.horizontal_lanes-1),
-                            "toLane": str(self.horizontal_lanes-1),
+                            "toLane": str(l),
                             "signal_group": 1
                             }]
 
@@ -777,7 +780,6 @@ class SingleIntersectionNet(Network):
                     conn += new_con("right", node_id, top_node_id, lane, 2)  # vectical /|\
                     conn += new_con("left", top_node_id, node_id, lane, 2)  # vectical \|/
                     if lane == 0:
-
                         conn += [{
                             "from": "right" + node_id,
                             "to": "bot" + right_node_id,
@@ -794,20 +796,21 @@ class SingleIntersectionNet(Network):
                         }]
 
                 # left lanes
-                conn += [{
-                    "from": "right" + node_id,
-                    "to": "top" + node_id,
-                    "fromLane": str(self.vertical_lanes-1),
-                    "toLane": str(self.vertical_lanes-1),
-                    "signal_group": 2
-                }]
-                conn += [{
-                    "from": "left" + top_node_id,
-                    "to": "bot" + right_node_id,
-                    "fromLane": str(self.vertical_lanes-1),
-                    "toLane": str(self.vertical_lanes-1),
-                    "signal_group": 2
-                }]
+                for l in range(self.vertical_lanes):
+                    conn += [{
+                        "from": "right" + node_id,
+                        "to": "top" + node_id,
+                        "fromLane": str(self.vertical_lanes-1),
+                        "toLane": str(l),
+                        "signal_group": 2
+                        }]
+                    conn += [{
+                        "from": "left" + top_node_id,
+                        "to": "bot" + right_node_id,
+                        "fromLane": str(self.vertical_lanes-1),
+                        "toLane": str(l),
+                        "signal_group": 2
+                        }]
 
                 node_id = "center{}".format(i * self.col_num + j)
                 con_dict[node_id] = conn
@@ -866,7 +869,7 @@ class SingleIntersectionNet(Network):
                 "priority": 78,
                 "from": "center" + str(from_node),
                 "to": "center" + str(to_node),
-                "length": self.inner_length
+                "length": self.inner_length * (0.8 + 0.4 * random.random())
             }]
 
         # Build the horizontal inner edges
@@ -901,7 +904,7 @@ class SingleIntersectionNet(Network):
                 "priority": 78,
                 "from": from_node,
                 "to": to_node,
-                "length": length
+                "length": length* (0.8 + 0.4 * random.random())
             }]
 
         for i in range(self.col_num):
@@ -1033,4 +1036,3 @@ class SingleIntersectionNet(Network):
                                     right_edge_id, top_edge_id]
 
         return sorted(mapping.items(), key=lambda x: x[0])
-
