@@ -2,16 +2,15 @@ from flow.core.params import SumoParams, EnvParams
 from flow.core.params import TrafficLightParams
 from flow.core.params import VehicleParams
 from flow.core.params import SumoCarFollowingParams
+from flow.core.params import SumoLaneChangeParams
 from flow.core.experiment import Experiment
 from flow.envs.ring.accel import AccelEnv, ADDITIONAL_ENV_PARAMS
-from flow.controllers import GridRecycleRouter
+from flow.controllers import GridRecycleRouter, ExpTravelTimeRouter
 from flow.networks.traffic_light_grid import SingleIntersectionNet
-'''tools from workspace'''
 from flow.utils import inflow_methods
 
 # some hyper-params used in scenario
 USE_INFLOWS = True
-
 v_enter = 10
 inner_length = 500
 long_length = 700
@@ -21,7 +20,7 @@ num_cars_right = 1
 num_cars_top = 1
 num_cars_bot = 1
 n_columns = 5
-n_rows = 2
+n_rows = 3
 
 tl_logic = TrafficLightParams(baseline=False)
 phases = [{
@@ -29,43 +28,44 @@ phases = [{
     "duration": "31",
     "minDur": "8",
     "maxDur": "45",
-    "state": "GGGrGrrrGGGrGrrr"
+    "state": "GGGrrrGrrrrrGGGrrrGrrrrr"
 }, { # N-S go through yellow
     "duration": "6",
     "minDur": "3",
     "maxDur": "6",
-    "state": "GyyrGrrrGyyrGrrr"
+    "state": "GyyrrrGrrrrrGyyrrrGrrrrr"
 }, {# N-S left turn
     "duration": "20",
     "minDur": "8",
     "maxDur": "25",
-    "state": "GrrGGrrrGrrGGrrr"
+    "state": "GrrGGGGrrrrrGrrGGGGrrrrr"
 }, {# N-S left turn yellow
     "duration": "6",
     "minDur": "3",
     "maxDur": "6",
-    "state": "GrryGrrrGrryGrrr"
+    "state": "GrryyyGrrrrrGrryyyGrrrrr"
 }, { # W-E go through
     "duration": "31",
     "minDur": "8",
     "maxDur": "45",
-    "state": "GrrrGGGrGrrrGGGr"
+    "state": "GrrrrrGGGrrrGrrrrrGGGrrr"
 }, { # W-E go through yellow
     "duration": "6",
     "minDur": "3",
     "maxDur": "6",
-    "state": "GrrrGyyrGrrrGyyr"
+    "state": "GrrrrrGyyrrrGrrrrrGyyrrr"
 }, {# W-E left turn
     "duration": "20",
     "minDur": "8",
     "maxDur": "25",
-    "state": "GrrrGrrGGrrrGrrG"
+    "state": "GrrrrrGrrGGGGrrrrrGrrGGG"
 }, {# W-E left turn yellow
     "duration": "6",
     "minDur": "3",
     "maxDur": "6",
-    "state": "GrrrGrryGrrrGrry"
+    "state": "GrrrrrGrryyyGrrrrrGrryyy"
 }]
+
 for center in range(n_columns*n_rows):
     tl_logic.add('center'+str(center), phases=phases, tls_type="static", programID='1')
 
@@ -98,17 +98,14 @@ ADDITIONAL_NET_PARAMS = {
     # speed limit for all edges, may be represented as a float value, or a
     # dictionary with separate values for vertical and horizontal lanes
     "speed_limit": {
-        "horizontal": 35,
-        "vertical": 35
+        "horizontal": 30,
+        "vertical": 30
     },
     "traffic_lights": True
 }  # the net_params
 
 tot_cars = (num_cars_left + num_cars_right) * n_columns \
            + (num_cars_top + num_cars_bot) * n_rows
-
-
-
 
 vehs = VehicleParams()
 vehs.add(
@@ -118,23 +115,23 @@ vehs.add(
         min_gap=2.5,
         decel=7.5,
     ),
-    #lane_change_controller=(ImmediateLaneChanger,{}),
     num_vehicles=tot_cars-1,
     color='white',
 )
 vehs.add(
     veh_id='test',
-    routing_controller=(GridRecycleRouter,{}),
+    routing_controller=(ExpTravelTimeRouter,{}),
     car_following_params=SumoCarFollowingParams(
         min_gap=2.5,
         decel=7.5,
     ),
-    #lane_change_controller=(ImmediateLaneChanger,{}),
     num_vehicles=1,
     color='red',
+    lane_change_params=SumoLaneChangeParams(lane_change_mode="only_strategic_aggressive")
 )
-env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
 
+
+env_params = EnvParams(additional_params=ADDITIONAL_ENV_PARAMS)
 
 """params using in simulation"""
 sim_params = SumoParams(sim_step=0.1, render=True, emission_path='data')
@@ -163,6 +160,6 @@ flow_params = dict(
 
 
 '''exp run'''
-flow_params['env'].horizon = 3000
+flow_params['env'].horizon = 5000
 exp = Experiment(flow_params)
 _ = exp.run(1, convert_to_csv=True)
