@@ -23,19 +23,19 @@ from flow.controllers.velocity_controllers import FollowerStopper, \
 from flow.controllers.base_lane_changing_controller import \
     BaseLaneChangeController
 from flow.controllers.lane_change_controllers import StaticLaneChanger, \
-    SimLaneChangeController
+    SimLaneChangeController, CAVLaneChanger
 
 # routing controllers
 from flow.controllers.base_routing_controller import BaseRouter
 from flow.controllers.routing_controllers import ContinuousRouter, \
-    GridRouter, BayBridgeRouter, I210Router
+    GridRouter, BayBridgeRouter, I210Router,GridRecycleRouter, ExpTravelTimeRouter
 
 __all__ = [
     "RLController", "BaseController", "BaseLaneChangeController", "BaseRouter",
     "CFMController", "BCMController", "OVMController", "LinearOVM",
     "IDMController", "SimCarFollowingController", "FollowerStopper",
-    "PISaturation", "StaticLaneChanger", "SimLaneChangeController",
+    "PISaturation", "StaticLaneChanger", "SimLaneChangeController","CAVLaneChanger",
     "ContinuousRouter", "GridRouter", "BayBridgeRouter", "LACController",
-    "GippsController", "NonLocalFollowerStopper", "BandoFTLController",
-    "I210Router"
+    "GippsController" ,"GridRecycleRouter", "NonLocalFollowerStopper", "BandoFTLController",
+    "I210Router", "ExpTravelTimeRouter"
 ]
