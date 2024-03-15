@@ -20,7 +20,7 @@ N_ROLLOUTS = 5  # number of rollouts per training iteration
 N_CPUS = 10  # number of parallel workers
 
 # Environment parameters
-HORIZON = 500  # time horizon of a single rollout
+HORIZON = 200  # time horizon of a single rollout
 V_ENTER = 10  # enter speed for departing vehicles
 INNER_LENGTH = 300  # length of inner edges in the traffic light grid network
 LONG_LENGTH = 700  # length of final edge in route
@@ -162,7 +162,7 @@ def setup_exps():
     config["model"].update({"fcnet_hiddens": [3, 3]})
     config["use_gae"] = True
     config["lambda"] = 0.97
-    config["vf_clip_param"] = 1000
+    config["vf_clip_param"] = 1000000
     config["kl_target"] = 0.02
     config["num_sgd_iter"] = 10
     config['clip_actions'] = False  # FIXME(ev) temporary ray bug
@@ -194,7 +194,7 @@ trials = run_experiments({
         "checkpoint_at_end": True,
         "max_failures": 999,
         "stop": {
-            "training_iteration": 30,
+            "training_iteration": 100,
         },
     }
 })
