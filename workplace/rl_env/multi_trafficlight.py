@@ -1,7 +1,7 @@
 """Multi-agent traffic light example (single shared policy)."""
 
 from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
-from flow.envs.multiagent.multi_trafficlight_e1 import MultiTrafficLightGrid_a_Env
+from flow.envs.multiagent.traffic_light_grid import MultiTrafficLightGridSEUEnv
 from flow.networks.traffic_light_grid import SingleIntersectionNet
 from flow.core.params import SumoParams, EnvParams, InitialConfig, NetParams
 from flow.core.params import InFlows, SumoCarFollowingParams, VehicleParams
@@ -72,7 +72,7 @@ flow_params = dict(
     exp_tag="grid_0_{}x{}_i{}_multiagent".format(N_ROWS, N_COLUMNS, EDGE_INFLOW),
 
     # name of the flow environment the experiment is running on
-    env_name=MultiTrafficLightGrid_a_Env,
+    env_name=MultiTrafficLightGridSEUEnv,
 
     # name of the network class the experiment is running on
     network=SingleIntersectionNet,
