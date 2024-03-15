@@ -9,7 +9,7 @@ from gym.spaces.box import Box
 from gym.spaces.discrete import Discrete
 
 from flow.core import rewards
-from flow.envs.trafficlight_e4 import TrafficLightGrid_a_Env
+from flow.envs.trafficlight_e1 import TrafficLightGrid_a_Env
 from flow.envs.multiagent import MultiEnv
 
 ADDITIONAL_ENV_PARAMS = {
@@ -120,20 +120,18 @@ class MultiTrafficLightGrid_a_Env(TrafficLightGrid_a_Env, MultiEnv):
 
                 # check which edges we have so we can always pad in the right
                 # positions
-                local_speeds.extend(
-                    [self.k.vehicle.get_speed(veh_id) / max_speed for veh_id in
-                     observed_ids])
-                local_dists_to_intersec.extend([(self.k.network.edge_length(
-                    self.k.vehicle.get_edge(
-                        veh_id)) - self.k.vehicle.get_position(
-                    veh_id)) / max_dist for veh_id in observed_ids])
-                local_acc.extend([self.k.vehicle.get_accel(veh_id) for veh_id in observed_ids])
-
-                if len(observed_ids) < self.num_observed*3:
-                    diff = self.num_observed*3 - len(observed_ids)
-                    local_speeds.extend([0] * diff)
-                    local_dists_to_intersec.extend([0] * diff)
-                    local_acc.extend([0] * diff)
+                for observed_id in observed_ids:
+                    if observed_id != "":
+                        local_speeds.extend(
+                            [self.k.vehicle.get_speed(observed_id) / max_speed ])
+                        local_dists_to_intersec.extend([(self.k.network.edge_length(
+                            self.k.vehicle.get_edge(observed_id)) -
+                            self.k.vehicle.get_position(observed_id)) / max_dist ])
+                        local_acc.extend([self.k.vehicle.get_accel(observed_id) ])
+                    elif observed_id=="":
+                        local_speeds.extend([0])
+                        local_dists_to_intersec.extend([0])
+                        local_acc.extend([0])
 
             speeds.append(local_speeds)
             dist_to_intersec.append(local_dists_to_intersec)
@@ -336,7 +334,7 @@ class MultiTrafficLightGrid_a_Env(TrafficLightGrid_a_Env, MultiEnv):
         dist = edge_len - relative_pos
         return dist
 
-    def get_closest_to_intersection_lane(self, edges, num_closest, padding=False):
+    def get_closest_to_intersection_lane(self, edges, num_closest, padding=True):
 
         if num_closest <= 0:
             raise ValueError("Function get_closest_to_intersection_lane called with"
