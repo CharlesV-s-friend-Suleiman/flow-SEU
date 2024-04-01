@@ -521,7 +521,18 @@ class Env(gym.Env, metaclass=ABCMeta):
         # advance the simulation in the simulator by one step
         self.k.simulation.simulation_step()
 
+        if 'cav_0' not in self.initial_ids:
+            print("re_init cav0")
+            type_id, edge, lane_index, pos, speed = \
+                self.initial_state['cav_0']
+            self.k.vehicle.add(veh_id='cav_0',
+                               type_id='cav',
+                               edge=edge,
+                               lane=lane_index,
+                               pos=pos,
+                               speed=speed,)
         # update the information in each kernel to match the current state
+        # the cav route is empty before update , after update getting its route
         self.k.update(reset=True)
 
         # update the colors of vehicles
@@ -557,7 +568,6 @@ class Env(gym.Env, metaclass=ABCMeta):
 
         # render a frame
         self.render(reset=True)
-
         return observation
 
     def additional_command(self):

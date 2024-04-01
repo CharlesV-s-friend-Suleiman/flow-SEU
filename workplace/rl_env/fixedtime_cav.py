@@ -22,8 +22,8 @@ from flow.utils import inflow_methods
 # some hyper-params used in scenario
 
 ADDITIONAL_ENV_PARAMS = {
-    "max_accel": 1,
-    "max_decel": 1,
+    "max_accel": 3,
+    "max_decel": 15,
 }
 USE_INFLOWS = True
 v_enter = 10
@@ -36,6 +36,7 @@ num_cars_top = 1
 num_cars_bot = 1
 n_columns = 4
 n_rows = 3
+
 
 tl_logic = TrafficLightParams(baseline=False)
 phases = [{
@@ -139,10 +140,6 @@ vehs.add(
     veh_id='cav',
     acceleration_controller=(RLController,{}),
     routing_controller=(ExpTravelTimeRouter,{}),
-    car_following_params=SumoCarFollowingParams(
-        min_gap=2.5,
-        decel=7.5,
-    ),
     num_vehicles=1,
     color='red',
     lane_change_params=SumoLaneChangeParams(lane_change_mode="only_strategic_aggressive")
@@ -205,15 +202,15 @@ def setup_exps():
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     config["num_gpus"] = 1  # nums of gpu
-    config["num_workers"] = 9
+    config["num_workers"] = 8
     config["train_batch_size"] = HORIZON * N_ROLLOUTS
-    config["gamma"] = 0.999  # discount rate
+    config["gamma"] = 0.99  # discount rate
     config["model"].update({"fcnet_hiddens": [3, 3]})
     config["use_gae"] = True
     config["lambda"] = 0.97
     config["kl_target"] = 0.02
     config["num_sgd_iter"] = 10
-    config['clip_actions'] = False  # FIXME(ev) temporary ray bug
+    config['clip_actions'] = False
     config["horizon"] = HORIZON
 
     # save the flow params for replay

@@ -42,7 +42,6 @@ def find_routes(edge_start, edge_end):
         if edge_direction in ["top", "bot"]:
             return i <= I and j <= J
 
-
 # DFS
     visited = [edge_start]
     route = []

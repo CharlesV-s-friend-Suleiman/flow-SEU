@@ -326,7 +326,6 @@ class ExpTravelTimeRouter(BaseRouter):
         return _getmin(routes)
 
 
-
 class BayBridgeRouter(ContinuousRouter):
     """Assists in choosing routes in select cases for the Bay Bridge network.
 

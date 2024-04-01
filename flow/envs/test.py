@@ -57,8 +57,8 @@ class TestEnv(Env):
 
 
 ADDITIONAL_ENV_PARAMS = {
-    "max_accel" : 3,
-    "max_decel" : 3,
+    "max_accel": 3,
+    "max_decel": 15,  # emergency stop
 }
 
 
@@ -67,6 +67,7 @@ class CoopEnv(Env):
     env including cav and tl,this is the cav part ,
      the action space of cav is acceleration [-3, 3] m/s^-2
     """
+
     @property
     def action_space(self):
         num_actions = self.initial_vehicles.num_rl_vehicles
@@ -83,7 +84,7 @@ class CoopEnv(Env):
         nor_speed = Box(
             low=0,
             high=1.2,
-            shape=(3,self.initial_vehicles.num_rl_vehicles),
+            shape=(3, self.initial_vehicles.num_rl_vehicles),
             dtype=np.float32)
 
         position = Box(
@@ -179,11 +180,12 @@ class CoopEnv(Env):
 
         # the reward to forward the vehicles
 
-        average_rl_speed = (sum(self.k.vehicle.get_speed(ids)) + .001)/ (num_rl_veh + .001)
+        average_rl_speed = (sum(self.k.vehicle.get_speed(ids)) + .001) / (num_rl_veh + .001)
 
         rv = average_rl_speed / max_speed
+
         if average_rl_speed - max_speed >= 5:
-           rv -= - 10
+            rv -= - 10
 
         return rv
 
@@ -217,6 +219,8 @@ class CoopEnv(Env):
         info : dict
             contains other diagnostic information from the previous action
         """
+
+        rl_collision = False
         for _ in range(self.env_params.sims_per_step):
             self.time_counter += 1
             self.step_counter += 1
@@ -271,16 +275,25 @@ class CoopEnv(Env):
                 self.k.vehicle.update_vehicle_colors()
 
             # crash encodes whether the simulator experienced a collision
-            crash = self.k.simulation.check_collision()
-
+            rl_collision = False
             # stop collecting new simulation steps if there is a collision
-            if crash:
+            for rl_ids in self.k.vehicle.get_rl_ids():
+                if rl_ids in self.k.simulation.collision_list():
+                    rl_collision = True
+                    break
+
+            if rl_collision or self.k.vehicle.num_rl_vehicles == 0:
                 break
 
             # render a frame
             self.render()
 
-        states = self.get_state()
+        # use dummy[[0,0,0],[0,0,0]] to fix the num_rl==0 bug
+        dummy_states = np.zeros_like(self.observation_space.sample())
+        if self.k.vehicle.num_rl_vehicles == 0:
+            states = dummy_states
+        else:
+            states = self.get_state()
 
         # collect information of the state of the network based on the
         # environment class used
@@ -292,30 +305,21 @@ class CoopEnv(Env):
         # test if the environment should terminate due to a collision caused by rl-veh or the
         # time horizon being met
 
-        rl_collision = False
-        for rl_ids in self.k.vehicle.get_rl_ids():
-            if rl_ids in self.k.simulation.collision_list():
-                rl_collision = True
-                break
-
         done = (
                 self.time_counter >= self.env_params.sims_per_step *
-                (self.env_params.warmup_steps + self.env_params.horizon)
-                 or self.k.vehicle.num_rl_vehicles == 0 or crash
-                )
-
+                (self.env_params.warmup_steps + self.env_params.horizon) or
+                rl_collision or self.k.vehicle.num_rl_vehicles == 0)
+        if done:
+            print(self.time_counter, self.k.vehicle.num_rl_vehicles)
         # compute the info for each agent
         infos = {}
-        if done:
-            print(self.k.simulation.collision_list())
         # compute the reward
         if self.env_params.clip_actions:
             rl_clipped = self.clip_actions(rl_actions)
-            reward = self.compute_reward(rl_clipped, fail=crash)
+            reward = self.compute_reward(rl_clipped, fail=self.k.simulation.check_collision())
         else:
-            reward = self.compute_reward(rl_actions, fail=crash)
+            reward = self.compute_reward(rl_actions, fail=self.k.simulation.check_collision())
 
         return next_observation, reward, done, infos
-
 
 

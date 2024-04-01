@@ -698,9 +698,9 @@ class SingleIntersectionNet(Network):
                 routes[right_id] += ["right{}_{}".format(i, j)]
 
         # build a per-generated route for the CAV
-        special_id = self.vehicles.ids[-1]
-        edge_o, edge_d = "bot0_0", "bot{}_{}".format(self.row_num - 1, self.col_num)
-        routes[special_id] = route_tools.find_routes(edge_o, edge_d)
+        for ids in self.vehicles.rl_ids:
+            edge_o, edge_d = "bot0_0", "bot{}_{}".format(self.row_num - 1, self.col_num)
+            routes[ids] = route_tools.find_routes(edge_o, edge_d)
 
         return routes
 

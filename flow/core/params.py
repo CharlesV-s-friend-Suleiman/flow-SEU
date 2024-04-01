@@ -249,6 +249,9 @@ class VehicleParams:
         #: vehicle
         self.minGap = dict()
 
+        #: list of ids of rl vehicles
+        self.rl_ids = []
+
         #: list : initial state of the vehicles class, used for serialization
         #: purposes
         self.initial = []
@@ -357,6 +360,7 @@ class VehicleParams:
             self.num_vehicles += 1
             if acceleration_controller[0] == RLController:
                 self.num_rl_vehicles += 1
+                self.rl_ids.append(v_id)
 
         # increase the number of unique types of vehicles in the network, and
         # add the type to the list of types

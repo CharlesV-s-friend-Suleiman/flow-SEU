@@ -12,9 +12,9 @@ iteration = df["training_iteration"]
 
 
 fig = plt.figure(figsize=(10, 8))
-plt.scatter(iteration, max_r, label="max-reward per iteration", c='y')
-plt.scatter(iteration, r, label="mean-reward per iteration", c='b')
-plt.scatter(iteration, min_r, label="min-reward per iteration", c='r')
+plt.scatter(iteration, max_r, label="max-reward per iteration", c='y',s=15)
+plt.scatter(iteration, r, label="mean-reward per iteration", c='b',s=15)
+plt.scatter(iteration, min_r, label="min-reward per iteration", c='r',s=15)
 plt.fill_between(iteration, min_r, max_r, where=(max_r>min_r),color='y',alpha=0.3)
 
 plt.xlabel('number of iterations')

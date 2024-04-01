@@ -891,7 +891,7 @@ class TrafficLightGridSEUEnv(Env):
         self.observed_ids = all_observed_ids
         return np.array(
             np.concatenate([
-                NQI_mean,speeds, dist_to_intersec,
+                NQI_mean, speeds, dist_to_intersec,
             ]))
 
     def _apply_rl_actions(self, rl_actions):

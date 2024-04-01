@@ -12,7 +12,6 @@ from flow.envs.ring.wave_attenuation import WaveAttenuationEnv, \
     WaveAttenuationPOEnv
 from flow.envs.merge import MergePOEnv
 from flow.envs.test import TestEnv, CoopEnv
-from flow.envs.testorginal import  Coop1Env
 
 
 # deprecated classes whose names have changed
@@ -45,5 +44,4 @@ __all__ = [
     'PO_TrafficLightGridEnv',
     'GreenWaveTestEnv',
     'CoopEnv',
-    'Coop1Env'
 ]

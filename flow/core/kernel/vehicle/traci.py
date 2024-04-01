@@ -135,7 +135,6 @@ class TraCIVehicle(KernelVehicle):
             step
         """
         # copy over the previous speeds
-
         vehicle_obs = {}
         for veh_id in self.__ids:
             self.previous_speeds[veh_id] = self.get_speed(veh_id)
@@ -1099,6 +1098,9 @@ class TraCIVehicle(KernelVehicle):
         r, g, b = color
         self.kernel_api.vehicle.setColor(
             vehID=veh_id, color=(r, g, b, 255))
+
+    def set_route(self, veh_id, route):
+        self.kernel_api.vehicle.setRoute(vehID=veh_id, route=route)
 
     def add(self, veh_id, type_id, edge, pos, lane, speed):
         """See parent class."""
