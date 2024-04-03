@@ -152,7 +152,6 @@ def setup_exps():
         training configuration parameters
     """
     alg_run = "PPO"
-
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     config["num_gpus"] = 1

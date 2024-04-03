@@ -314,7 +314,6 @@ class MultiTrafficLightGridSEUEnv(TrafficLightGridSEUEnv, MultiEnv):
     @property
     def observation_space(self):
         """State space that is partially observed."""
-
         tl_box = Box(
             low=0.,
             high=1,

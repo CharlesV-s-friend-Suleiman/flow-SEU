@@ -1014,7 +1014,6 @@ class SingleIntersectionNet(Network):
     @property
     def node_mapping(self):
         """Map nodes to edges.
-
         Returns a list of pairs (node, connected edges) of all inner nodes
         and for each of them, the 4 edges that leave this node.
 
@@ -1036,3 +1035,12 @@ class SingleIntersectionNet(Network):
                                     right_edge_id, top_edge_id]
 
         return sorted(mapping.items(), key=lambda x: x[0])
+
+    def get_states(self):
+        states_tl = {}
+        for tlLogic in sumolib.output.parse(self.net_file_path, ['tlLogic']):
+            states = []
+            for each in tlLogic['phase']:
+                states.append(each.state)
+            states_tl.update({tlLogic.id: states})
+        return states_tl
