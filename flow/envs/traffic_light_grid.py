@@ -765,6 +765,8 @@ class TrafficLightGridSEUEnv(Env):
     Class for SEUflow-project
 
     This class is the base of multi-intersection scenario, with state by computing Normal_Queue_Index
+
+    奖励函数为路网平均车辆延误的惩罚！！！
     """
     def __init__(self, env_params, sim_params, network, simulator='traci'):
 
@@ -891,7 +893,7 @@ class TrafficLightGridSEUEnv(Env):
         self.observed_ids = all_observed_ids
         return np.array(
             np.concatenate([
-                NQI_mean, speeds, dist_to_intersec,
+                NQI_mean,speeds, dist_to_intersec,
             ]))
 
     def _apply_rl_actions(self, rl_actions):
@@ -1007,3 +1009,236 @@ class TrafficLightGridSEUEnv(Env):
         result += (veh_ids_ordered_lane_2[:num_closest] + (pad_lst if padding else []))
 
         return result
+
+
+class TrafficLightGridSEUPressEnv(TrafficLightGridSEUEnv):
+    """
+    Class for SEUflow-project
+
+    奖励函数为交叉口压力的惩罚。
+    """
+    def compute_reward(self, rl_actions, **kwargs):
+        """See class definition."""
+        # if self.env_params.evaluate:
+        #     return - rewards.min_delay_unscaled(self)
+        # else:
+        #     return (- rewards.min_delay_unscaled(self) +
+        #             rewards.penalize_standstill(self, gain=0.2))
+        if self.env_params.evaluate:
+            NIN=0
+            for nodes, edges in self.network.node_mapping:
+                Nin=0
+                for edge in edges:
+                    vehs = self.k.vehicle.get_ids_by_edge(edge)
+                    Nin+=len(vehs)
+                NIN+=Nin
+
+            NOUT = 0
+            for nodes, edges in self.network.node_mapping_leave:
+                Nout=0
+                for edge in edges:
+                    vehs = self.k.vehicle.get_ids_by_edge(edge)
+                    Nout+=len(vehs)
+                NOUT+=Nout
+
+            grid_array = self.net_params.additional_params["grid_array"]
+            max_dist = max(grid_array["short_length"], grid_array["long_length"],
+                           grid_array["inner_length"])
+
+            return -(NIN-NOUT)/3/max_dist/0.15 + rewards.penalize_standstill(self, gain=0.5)
+        else:
+            NIN = 0
+            for nodes, edges in self.network.node_mapping:
+                Nin = 0
+                for edge in edges:
+                    vehs = self.k.vehicle.get_ids_by_edge(edge)
+                    Nin += len(vehs)
+                NIN += Nin
+
+            NOUT = 0
+            for nodes, edges in self.network.node_mapping_leave:
+                Nout = 0
+                for edge in edges:
+                    vehs = self.k.vehicle.get_ids_by_edge(edge)
+                    Nout += len(vehs)
+                NOUT += Nout
+
+            grid_array = self.net_params.additional_params["grid_array"]
+            max_dist = max(grid_array["short_length"], grid_array["long_length"],
+                           grid_array["inner_length"])
+            # return -(NIN - NOUT) / 3 / max_dist / 0.15 + rewards.penalize_standstill(self, gain=0.5)
+            veh_ids = self.k.vehicle.get_ids()
+            vel = np.array(self.k.vehicle.get_speed(veh_ids))
+            penalty =  len(vel[vel == 0]) /len(vel)
+
+            return -(NIN - NOUT) /3/ max_dist / 0.15 - penalty
+
+class TrafficLightGridSEUYellowEnv(TrafficLightGridSEUEnv):
+    """
+    相位带黄灯，至少为3秒
+    绿灯至少为5秒
+    """
+    def __init__(self, env_params, sim_params, network, simulator='traci'):
+
+        super().__init__(env_params, sim_params, network, simulator)
+        for p in ADDITIONAL_ENV_PARAMS.keys():
+            if p not in env_params.additional_params:
+                raise KeyError(
+                    'Environment parameter "{}" not supplied'.format(p))
+
+        if self.tl_type != "actuated":
+            for i in range(self.rows * self.cols):
+                self.k.traffic_light.set_state(
+                    node_id='center' + str(i), state="GGGrrrrrrrrrGGGrrrrrrrrr")
+
+        self.discrete = env_params.additional_params.get("discrete", True)
+        self.lastphase=[0]
+        self.last_change2green = [0]
+        self.last_change2yellow=[]
+        self.current_yellow=[0]
+        self.nowsecond=[0]
+    def _apply_rl_actions(self, rl_actions):
+        """See class definition."""
+
+        if self.discrete:
+            # convert single value to list of 0's ,1',2's and 3's
+            rl_mask = [int(x) for x in list('{}'.format(rl_actions))]
+            rl_mask = [0] * (self.num_traffic_lights - len(rl_mask)) + rl_mask
+        else:
+            # convert values less than 0 to zero and above 0 to 1. 0 indicates
+            # that should not switch the direction, and 1 indicates that switch
+            # should happen
+            # convert single value to list of 0's ,1',2's and 3's
+            rl_mask = rl_actions > 0.0
+        for i, action in enumerate(rl_mask):
+            if self.current_yellow[-1]==0:  #是红绿状态
+                if self.nowsecond[-1]-self.last_change2green[-1] <= 5:
+                    continue
+                else:
+                    if self.lastphase[-1]==0:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="yyyrrrrrrrrryyyrrrrrrrrr")
+                    elif self.lastphase[-1]==1:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="rrryyyrrrrrrrrryyyrrrrrr")
+                    elif self.lastphase[-1]== 2:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="rrrrrryyyrrrrrrrrryyyrrr")
+                    elif self.lastphase[-1]== 3:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="rrrrrrrrryyyrrrrrrrrryyy")
+                    self.last_change2yellow.append(self.nowsecond[-1])
+                    self.current_yellow.append(1)
+            else: #是红黄状态
+                   if self.nowsecond[-1]-self.last_change2yellow[-1] <= 3:
+                        continue
+                   else:
+                       if action == 0:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="GGGrrrrrrrrrGGGrrrrrrrrr")
+                       elif action == 1:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="rrrGGGrrrrrrrrrGGGrrrrrr")
+                       elif action == 2:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="rrrrrrGGGrrrrrrrrrGGGrrr")
+                       elif action == 3:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="rrrrrrrrrGGGrrrrrrrrrGGG")
+                       self.last_change2green.append(self.nowsecond[-1])
+                       self.current_yellow.append(0)
+                       self.lastphase.append(action)
+        self.nowsecond.append((self.nowsecond[-1] + 1))
+
+class TrafficLightGridSEUYellowPressEnv(TrafficLightGridSEUPressEnv):
+    """
+    相位带黄灯，至少为3秒
+    绿灯至少为5秒
+    """
+    def __init__(self, env_params, sim_params, network, simulator='traci'):
+
+        super().__init__(env_params, sim_params, network, simulator)
+        for p in ADDITIONAL_ENV_PARAMS.keys():
+            if p not in env_params.additional_params:
+                raise KeyError(
+                    'Environment parameter "{}" not supplied'.format(p))
+
+        if self.tl_type != "actuated":
+            for i in range(self.rows * self.cols):
+                self.k.traffic_light.set_state(
+                    node_id='center' + str(i), state="GGGrrrrrrrrrGGGrrrrrrrrr")
+
+        self.discrete = env_params.additional_params.get("discrete", True)
+        self.lastphase=[0]
+        self.last_change2green = [0]
+        self.last_change2yellow=[]
+        self.current_yellow=[0]
+        self.nowsecond=[0]
+    def _apply_rl_actions(self, rl_actions):
+        """See class definition."""
+
+        if self.discrete:
+            # convert single value to list of 0's ,1',2's and 3's
+            rl_mask = [int(x) for x in list('{}'.format(rl_actions))]
+            rl_mask = [0] * (self.num_traffic_lights - len(rl_mask)) + rl_mask
+        else:
+            # convert values less than 0 to zero and above 0 to 1. 0 indicates
+            # that should not switch the direction, and 1 indicates that switch
+            # should happen
+            # convert single value to list of 0's ,1',2's and 3's
+            rl_mask = rl_actions > 0.0
+        for i, action in enumerate(rl_mask):
+            if self.current_yellow[-1]==0:  #是红绿状态
+                if self.nowsecond[-1]-self.last_change2green[-1] <= 5:
+                    continue
+                else:
+                    if self.lastphase[-1]==0:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="yyyrrrrrrrrryyyrrrrrrrrr")
+                    elif self.lastphase[-1]==1:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="rrryyyrrrrrrrrryyyrrrrrr")
+                    elif self.lastphase[-1]== 2:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="rrrrrryyyrrrrrrrrryyyrrr")
+                    elif self.lastphase[-1]== 3:
+                        self.k.traffic_light.set_state(
+                            node_id='center{}'.format(i),
+                            state="rrrrrrrrryyyrrrrrrrrryyy")
+                    self.last_change2yellow.append(self.nowsecond[-1])
+                    self.current_yellow.append(1)
+            else: #是红黄状态
+                   if self.nowsecond[-1]-self.last_change2yellow[-1] <= 3:
+                        continue
+                   else:
+                       if action == 0:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="GGGrrrrrrrrrGGGrrrrrrrrr")
+                       elif action == 1:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="rrrGGGrrrrrrrrrGGGrrrrrr")
+                       elif action == 2:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="rrrrrrGGGrrrrrrrrrGGGrrr")
+                       elif action == 3:
+                           self.k.traffic_light.set_state(
+                               node_id='center{}'.format(i),
+                               state="rrrrrrrrrGGGrrrrrrrrrGGG")
+                       self.last_change2green.append(self.nowsecond[-1])
+                       self.current_yellow.append(0)
+                       self.lastphase.append(action)
+        self.nowsecond.append((self.nowsecond[-1] + 1))
