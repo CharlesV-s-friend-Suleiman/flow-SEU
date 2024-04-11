@@ -284,7 +284,10 @@ class ExpTravelTimeRouter(BaseRouter):
 
                     tt += edge_length / velocity
                     if tonode in light.get_properties():
-                        tt += 3 * float(light.get_properties()[tonode]["phases"][0]["duration"])
+                        try:
+                            tt += 3 * float(light.get_properties()[tonode]["phases"][0]["duration"])
+                        except:
+                            tt += 45
 
                 if tt <= mintt:
                     argmin_r, mintt = r, tt

@@ -3,12 +3,14 @@ environment for CAV and Traffic Light combined simulation
 using PPO algorithm
 """
 from flow.core.params import TrafficLightParams
-from flow.envs import CoopEnv
+from flow.envs.multiagent import CustomEnv
 from flow.controllers import GridRecycleRouter, ExpTravelTimeRouter, RLController
 from flow.core.params import SumoLaneChangeParams
 
 import json
 import ray
+from ray.rllib.agents.ppo.ppo_policy import PPOTFPolicy
+
 from ray.rllib.agents.registry import get_agent_class
 from ray.tune import run_experiments
 from ray.tune.registry import register_env
@@ -20,10 +22,7 @@ from flow.core.params import SumoParams, EnvParams
 from flow.core.params import VehicleParams, SumoCarFollowingParams
 from flow.utils import inflow_methods
 
-ADDITIONAL_ENV_PARAMS = {
-    "max_accel": 3,
-    "max_decel": 15,
-}
+
 USE_INFLOWS = True
 v_enter = 10
 inner_length = 500
@@ -109,7 +108,7 @@ else:
 flow_params = dict(
     # name of the experiment
     exp_tag="grid_0_{}x{}_multiagent".format(n_rows, n_columns),
-    env_name=CoopEnv,
+    env_name=CustomEnv,
     network=SingleIntersectionNet,
     simulator='traci',
     sim=SumoParams(
@@ -131,12 +130,15 @@ flow_params = dict(
             "tl_type": "controlled",
             "num_local_edges": 4,
             "num_local_lights": 4,
+            "max_accel": 3,
+            "max_decel": 15,
         },
     ),
     net=net_params,
     veh=vehs,
     initial=initial_config
     )
+
 
 def setup_exps():
     """Return the relevant components of an RLlib experiment.
@@ -172,9 +174,25 @@ def setup_exps():
     config['env_config']['run'] = alg_run
 
     create_env, gym_name = make_create_env(params=flow_params, version=0)
-
-    # Register as rllib env
     register_env(gym_name, create_env)
+
+    test_env = create_env()
+    obs_space_tl = test_env.observation_space_tl
+    act_space_tl = test_env.action_space_tl
+    obs_space_av = test_env.observation_space_av
+    act_space_av = test_env.action_space_av
+
+    POLICY_GRAPHS = {'cav': (PPOTFPolicy, obs_space_av, act_space_av, {}),
+                     'tl': (PPOTFPolicy, obs_space_tl, act_space_tl, {})}
+    POLICY_TO_TRAIN = ['cav', 'tl']
+    POLICY_MAPPING_FN = ray.tune.function(lambda agent_id: 'cav' if agent_id.startswith('rl') else 'tl')
+
+    # multiagent configuration
+
+    config['multiagent'].update({'policies': POLICY_GRAPHS})
+    config['multiagent'].update({'policy_mapping_fn': POLICY_MAPPING_FN})
+    config['multiagent'].update({'policies_to_train': POLICY_TO_TRAIN})
+
     return alg_run, gym_name, config
 
 

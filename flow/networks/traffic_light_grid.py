@@ -8,6 +8,7 @@ import numpy as np
 from flow.utils import route_tools
 from flow.utils import inflow_methods
 import random
+import sumolib
 
 ADDITIONAL_NET_PARAMS = {
     # dictionary of traffic light grid array data
@@ -621,7 +622,6 @@ class SingleIntersectionNet(Network):
                  ):
         optional = ["tl_logic"]
 
-        """to test the params inflowed"""
         for p in ADDITIONAL_NET_PARAMS.keys():
             if p not in net_params.additional_params and p not in optional:
                 raise KeyError('Network parameter "{}" not supplied'.format(p))
@@ -1036,11 +1036,38 @@ class SingleIntersectionNet(Network):
 
         return sorted(mapping.items(), key=lambda x: x[0])
 
+    def _get_incoming_edges(self):
+        # Initialize a dictionary to store the incoming edges for each node
+        incoming_edges = {node['id']: [] for node in self.nodes}
+
+        # Iterate over the edges in the network
+        for edge in self.edges:
+            # Add the edge to the incoming edges list of the destination node
+            incoming_edges[edge['to']].append(edge['id'])
+
+        return incoming_edges
+
+    def _get_outgoing_edges(self):
+        # Initialize a dictionary to store the outgoing edges for each node
+        outgoing_edges = {node['id']: [] for node in self.nodes}
+
+        # Iterate over the edges in the network
+        for edge in self.edges:
+            # Add the edge to the outgoing edges list of the source node
+            outgoing_edges[edge['from']].append(edge['id'])
+
+        return outgoing_edges
+
+    @property
+    def get_edge_mappings(self):
+        # the grid network has 4 incoming edges and 4 outgoing edges,
+        # this should be modified if the network is changed or using real-world data
+        mapping_inc, mapping_out = self._get_incoming_edges(), self._get_outgoing_edges()
+        return mapping_inc, 4, mapping_out, 4
+
     def get_states(self):
         states_tl = {}
-        for tlLogic in sumolib.output.parse(self.net_file_path, ['tlLogic']):
-            states = []
-            for each in tlLogic['phase']:
-                states.append(each.state)
-            states_tl.update({tlLogic.id: states})
+        for node in self._inner_nodes:
+            if node['id'] not in states_tl.keys():
+                states_tl[node['id']] = self.traffic_lights.get_properties()[node['id']]['id']
         return states_tl

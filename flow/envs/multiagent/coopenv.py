@@ -2,8 +2,6 @@
 Environment for implement of cooperation of trafficlight and autonomous vehicles via reinforcement-learning method
 """
 from random import choice
-from flow.core import rewards
-
 import numpy as np
 from gym.spaces import Box
 from gym.spaces.discrete import Discrete
@@ -56,16 +54,31 @@ class CustomEnv(MultiEnv):
         # network.nodemapping is a dict with the following structure:
         #                 mapping[node_id] = [left_edge_id, bot_edge_id,
         #                                     right_edge_id, top_edge_id]
-        self.mapping_inc, self.num_local_edges_max, self.mapping_out, self.num_out_edges_max = network.node_mapping
+        self.mapping_inc, self.num_local_edges_max, self.mapping_out, self.num_out_edges_max = network.get_edge_mappings
         self.lanes_related = []
         for each in self.mapping_inc.values():
             self.lanes_related.extend(each)
         for each in self.mapping_out.values():
             self.lanes_related.extend(each)
         # after 2 loops, self.lanes_related contains all the lanes around the intersections
-
+        # ['top0_1', 'left1_0', 'right0_0', 'bot0_0', 'bot0_1', 'top0_2',
+        # 'left1_1', 'right0_1', 'bot0_2', 'top0_3', 'left1_2', 'right0_2', 'bot0_3',
+        # 'left1_3', 'right0_3', 'top0_4', 'top1_1', 'right1_0', 'left2_0', 'bot1_0',
+        # 'bot1_1', 'top1_2', 'right1_1', 'left2_1', 'bot1_2', 'top1_3', 'right1_2',
+        # 'left2_2', 'bot1_3', 'right1_3', 'left2_3', 'top1_4', 'top2_1', 'right2_0',
+        # 'left3_0', 'bot2_0', 'bot2_1', 'top2_2', 'right2_1', 'left3_1', 'bot2_2',
+        # 'top2_3', 'right2_2', 'left3_2', 'bot2_3', 'right2_3', 'left3_3', 'top2_4',
+        # 'left0_0', 'right3_0', 'left0_1', 'right3_1', 'left0_2', 'right3_2', 'left0_3',
+        # 'right3_3', 'top0_0', 'bot0_4', 'top1_0', 'bot1_4', 'top2_0', 'bot2_4', 'bot0_1',
+        # 'right1_0', 'left0_0', 'top0_0', 'top0_1', 'bot0_2', 'right1_1', 'left0_1', 'top0_2',
+        # 'bot0_3', 'right1_2', 'left0_2', 'top0_3', 'right1_3', 'left0_3', 'bot0_4', 'bot1_1',
+        # 'left1_0', 'right2_0', 'top1_0', 'top1_1', 'bot1_2', 'left1_1', 'right2_1', 'top1_2',
+        # 'bot1_3', 'left1_2', 'right2_2', 'top1_3', 'left1_3', 'right2_3', 'bot1_4', 'bot2_1',
+        # 'left2_0', 'right3_0', 'top2_0', 'top2_1', 'bot2_2', 'left2_1', 'right3_1', 'top2_2',
+        # 'bot2_3', 'left2_2', 'right3_2', 'top2_3', 'left2_3', 'right3_3', 'bot2_4', 'right0_0',
+        # 'left3_0', 'right0_1', 'left3_1', 'right0_2', 'left3_2', 'right0_3', 'left3_3', 'bot0_0',
+        # 'top0_4', 'bot1_0', 'top1_4', 'bot2_0', 'top2_4']
         # traffic light
-        self.states_tl = network.get_states()
         self.num_traffic_lights = len(self.mapping_inc.keys())
         self.last_changes = [0.00] * self.num_traffic_lights
         self.currently_yellows = [0] * self.num_traffic_lights
@@ -81,6 +94,27 @@ class CustomEnv(MultiEnv):
         self.num_observed = env_params.additional_params.get("num_observed", 1)
         self.min_switch_time = env_params.additional_params["switch_time"]
         self.target_speed = env_params.additional_params.get("target_velocity", 15)
+        # number of nearest lights to observe, defaults to 4
+        self.num_local_lights = env_params.additional_params.get(
+            "num_local_lights", 4)
+
+        # number of nearest edges to observe, defaults to 4
+        self.num_local_edges = env_params.additional_params.get(
+            "num_local_edges", 4)
+        self.grid_array = network.net_params.additional_params["grid_array"]
+        self.rows = self.grid_array["row_num"]
+        self.cols = self.grid_array["col_num"]
+        self.tl_type = env_params.additional_params.get('tl_type')
+        if self.tl_type != "actuated":
+            for i in range(self.rows * self.cols):
+                self.k.traffic_light.set_state(
+                    node_id='center' + str(i), state="GGGrrrrrrrrrGGGrrrrrrrrr")
+        self.states_tl = {}
+        for node in self.k.traffic_light.get_ids():
+            self.states_tl[node] = ["GGGrrrrrrrrrGGGrrrrrrrrr",
+                                    "rrrGGGrrrrrrrrrGGGrrrrrr",
+                                    "rrrrrrGGGrrrrrrrrrGGGrrr",
+                                    "rrrrrrrrrGGGrrrrrrrrrGGG"]
 
     @property
     def action_space_av(self):
@@ -100,14 +134,19 @@ class CustomEnv(MultiEnv):
 
     @property
     def observation_space_tl(self):
-        """State space that is partially observed."""
-        tl_box = Box(
-            low=0.,
-            high=1,
-            shape=(4 * (1 + self.num_local_lights)
-                   + 2 * 3 * 4 * self.num_observed,),
-            dtype=np.float32)
-        return tl_box
+        return Box(low=0.,
+                   high=1,
+                   shape=(4 * self.num_local_edges_max * self.num_observed +
+                                          self.num_local_edges_max + self.num_out_edges_max + 3,)
+                   )
+
+    @property
+    def action_space(self):
+        return self.action_space_av, self.action_space_tl
+
+    @property
+    def observation_space(self):
+        return self.observation_space_av, self.observation_space_tl
 
     def full_name_edge_lane(self, veh_id):
         edge_id = self.k.vehicle.get_edge(veh_id)
@@ -163,6 +202,8 @@ class CustomEnv(MultiEnv):
                     del self.vehs_edges[each][each_veh]
             for veh in all_vehs:
                 self.vehs_edges[each].update({veh:self.get_observed_info_veh(veh,max_speed,max_length,norm_accel)})
+            if each not in veh_num_per_edge:
+                veh_num_per_edge[each] = {}
             veh_num_per_edge[each].update({each: len(self.vehs_edges[each].keys()) / w_max })
 
         # the veh information observed
@@ -211,15 +252,19 @@ class CustomEnv(MultiEnv):
             tl_id_num = list(self.mapping_inc.keys()).index(tl_id)
             local_edges = self.mapping_inc[tl_id]
             local_edges_out = self.mapping_out[tl_id]
-
-            veh_num_per_in = [veh_num_per_edge[each] for each in local_edges]
-            veh_num_per_out = [veh_num_per_edge[each] for each in local_edges_out]
+            veh_num_per_in = [veh_num_per_edge[each][each] for each in local_edges]
+            veh_num_per_out = [veh_num_per_edge[each][each] for each in local_edges_out]
 
             for cav_id in incoming_tl.keys():
                 if self.full_name_edge_lane(cav_id) in local_edges:
                     incoming_tl[cav_id] = tl_id_num  # get the id of the approaching TL
             states = self.states_tl[tl_id]
-            now_state = self.k.traffic_light.get_state(tl_id)
+
+            now_state = list(self.k.traffic_light.get_state(tl_id))
+            for _ in range(len(now_state)):
+                if now_state[_]=='g':
+                    now_state[_]='r'
+            now_state = ''.join(now_state)
             state_idx = states.index(now_state)
 
             con = [round(i, 8) for i in np.concatenate(
@@ -330,7 +375,11 @@ class CustomEnv(MultiEnv):
                 action = rl_action > 0.0
 
                 states = self.states_tl[rl_id]
-                now_state = self.k.traffic_light.get_state(rl_id)
+                now_state = list(self.k.traffic_light.get_state(rl_id))
+                for _ in range(len(now_state)):
+                    if now_state[_] == 'g':
+                        now_state[_] = 'r'
+                now_state = ''.join(now_state)
                 state_idx = states.index(now_state)
 
                 if self.currently_yellows[tl_id_num] == 1: # if current yellow then set the last change

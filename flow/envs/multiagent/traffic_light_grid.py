@@ -320,6 +320,7 @@ class MultiTrafficLightGridSEUEnv(TrafficLightGridSEUEnv, MultiEnv):
             shape=(4 * (1 + self.num_local_lights)
                    + 2 * 3 * 4 * self.num_observed,),
             dtype=np.float32)
+        # shape 4:NQI 1+SELIF_LIGHT:5  2:pos_veh v_veh, 3:lanes 4:directions self.num_observed:observed vehicles
         return tl_box
 
     def get_state(self):
