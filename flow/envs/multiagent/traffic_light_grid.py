@@ -298,7 +298,6 @@ class MultiTrafficLightGridSEUEnv(TrafficLightGridSEUEnv, MultiEnv):
         # number of nearest edges to observe, defaults to 4
         self.num_local_edges = env_params.additional_params.get(
             "num_local_edges", 4)
-        self.discrete = env_params.additional_params.get("discrete", True)
 
     @property
     def action_space(self):
@@ -322,7 +321,6 @@ class MultiTrafficLightGridSEUEnv(TrafficLightGridSEUEnv, MultiEnv):
             shape=(4 * (1 + self.num_local_lights)
                    + 2 * 3 * 4 * self.num_observed,),
             dtype=np.float32)
-        # shape 4:NQI 1+SELIF_LIGHT:5  2:pos_veh v_veh, 3:lanes 4:directions self.num_observed:observed vehicles
         return tl_box
 
     def get_state(self):
@@ -469,9 +467,10 @@ class MultiTrafficLightGridSEUEnv(TrafficLightGridSEUEnv, MultiEnv):
             return {}
 
         if self.env_params.evaluate:
-            rew = - rewards.min_delay_unscaled(self)
+            rew = -rewards.min_delay_unscaled(self)
         else:
-            rew = - rewards.min_delay_unscaled(self)
+            rew = (-rewards.min_delay_unscaled(self) +
+                   rewards.penalize_standstill(self, gain=0.2))
 
         # each agent receives reward normalized by number of lights
         rew /= self.num_traffic_lights
@@ -798,7 +797,11 @@ class MultiTrafficLightGridSEUPressEnv(MultiTrafficLightGridSEUEnv):
             grid_array = self.net_params.additional_params["grid_array"]
             max_dist = max(grid_array["short_length"], grid_array["long_length"],
                            grid_array["inner_length"])
-            rew = -(NIN - NOUT) / 3 / max_dist / 0.15+ rewards.penalize_standstill(self, gain=1)
+            veh_ids = self.k.vehicle.get_ids()
+            vel = np.array(self.k.vehicle.get_speed(veh_ids))
+            penalty = len(vel[vel == 0]) / len(vel)
+
+            rew = -(NIN - NOUT) / 3 / max_dist / 0.15 - penalty
 
         # each agent receives reward normalized by number of lights
         rew /= self.num_traffic_lights
