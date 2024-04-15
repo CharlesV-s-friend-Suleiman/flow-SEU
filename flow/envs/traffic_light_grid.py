@@ -1,6 +1,5 @@
 """Environments for networks with traffic lights.
-
-These environment
+    These environments
 """
 
 import numpy as np
@@ -788,8 +787,8 @@ class TrafficLightGridSEUEnv(Env):
         self.steps = env_params.horizon
 
         # number of vehicles nearest each intersection that is observed in the
-        # state space; defaults to 2
-        self.num_observed = env_params.additional_params.get("num_observed", 4)
+        # state space; defaults to 1
+        self.num_observed = env_params.additional_params.get("num_observed", 1)
 
         # used during visualization
         self.observed_ids = []
@@ -891,10 +890,12 @@ class TrafficLightGridSEUEnv(Env):
             self.nqi_left[i]= NQI_mean[i*4+3]
 
         self.observed_ids = all_observed_ids
-        return np.array(
+        state=np.array(
             np.concatenate([
-                NQI_mean,speeds, dist_to_intersec,
+                NQI_mean, speeds, dist_to_intersec,
             ]))
+
+        return state
 
     def _apply_rl_actions(self, rl_actions):
         """See class definition."""
