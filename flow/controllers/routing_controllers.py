@@ -5,6 +5,7 @@ import numpy as np
 
 from flow.controllers.base_routing_controller import BaseRouter
 
+
 class ContinuousRouter(BaseRouter):
     """A router used to continuously re-route of the vehicle in a closed ring.
 
@@ -96,7 +97,7 @@ class GridRouter(BaseRouter):
             # to the subscriptions in the first step that they departed
             return None
         elif env.k.vehicle.get_edge(self.veh_id) == \
-                env.k.vehicle.get_route(self.veh_id)[-1]: # the cur_edge is not last_edge in routes
+                env.k.vehicle.get_route(self.veh_id)[-1]:  # the cur_edge is not last_edge in routes
             return [env.k.vehicle.get_edge(self.veh_id)]
         else:
             return None
@@ -119,22 +120,34 @@ class GridRecycleRouter(BaseRouter):
             i, j = int(c_e[-3]), int(c_e[-1])  # get the index of current edge
             n_e = None
             if method == "r":
-                if edge_direction=="bot":n_e="left"+str(i)+"_"+str(j)
-                elif edge_direction=="right":n_e="bot"+str(i)+"_"+str(j+1)
-                elif edge_direction=="top":n_e="right"+str(i+1)+"_"+str(j-1)
-                else: n_e="top"+str(i-1)+"_"+str(j)
+                if edge_direction == "bot":
+                    n_e = "left" + str(i) + "_" + str(j)
+                elif edge_direction == "right":
+                    n_e = "bot" + str(i) + "_" + str(j + 1)
+                elif edge_direction == "top":
+                    n_e = "right" + str(i + 1) + "_" + str(j - 1)
+                else:
+                    n_e = "top" + str(i - 1) + "_" + str(j)
 
             elif method == "l":
-                if edge_direction=="bot":n_e="right"+str(i+1)+"_"+str(j)
-                elif edge_direction=="right":n_e="top"+str(i)+"_"+str(j)
-                elif edge_direction=="top":n_e="left"+str(i)+"_"+str(j-1)
-                else: n_e = "bot" + str(i-1) + "_" + str(j+1)
+                if edge_direction == "bot":
+                    n_e = "right" + str(i + 1) + "_" + str(j)
+                elif edge_direction == "right":
+                    n_e = "top" + str(i) + "_" + str(j)
+                elif edge_direction == "top":
+                    n_e = "left" + str(i) + "_" + str(j - 1)
+                else:
+                    n_e = "bot" + str(i - 1) + "_" + str(j + 1)
 
             elif method == "p":
-                if edge_direction=="bot":n_e=edge_direction+str(i)+"_"+str(j+1)
-                elif edge_direction=="right":n_e=edge_direction+str(i+1)+"_"+str(j)
-                elif edge_direction=="top":n_e=edge_direction+str(i)+"_"+str(j-1)
-                else: n_e = edge_direction + str(i-1) + "_" + str(j)
+                if edge_direction == "bot":
+                    n_e = edge_direction + str(i) + "_" + str(j + 1)
+                elif edge_direction == "right":
+                    n_e = edge_direction + str(i + 1) + "_" + str(j)
+                elif edge_direction == "top":
+                    n_e = edge_direction + str(i) + "_" + str(j - 1)
+                else:
+                    n_e = edge_direction + str(i - 1) + "_" + str(j)
 
             return n_e
 
@@ -161,21 +174,22 @@ class GridRecycleRouter(BaseRouter):
 
         if len(env.k.vehicle.get_route(self.veh_id)) == 0:
             return None
-        elif env.k.vehicle.get_edge(self.veh_id) in env.k.vehicle.get_route(self.veh_id)\
+        elif env.k.vehicle.get_edge(self.veh_id) in env.k.vehicle.get_route(self.veh_id) \
                 and not finish_the_travel(self.veh_id):
 
             current_edge = env.k.vehicle.get_edge(self.veh_id)
             if env.k.vehicle.get_lane(self.veh_id) == 0:  # right-turn routes
-                next_edge = get_next(current_edge,method="r")
-                return [current_edge,next_edge]
+                next_edge = get_next(current_edge, method="r")
+                return [current_edge, next_edge]
             elif env.k.vehicle.get_lane(self.veh_id) == 2:  # left-turn routes
                 next_edge = get_next(current_edge, method="l")
-                return [current_edge,next_edge]
-            else: # pass-through routes
+                return [current_edge, next_edge]
+            else:  # pass-through routes
                 if env.k.vehicle.get_edge(self.veh_id) == env.k.vehicle.get_route(self.veh_id)[-1]:
                     next_edge = get_next(current_edge, method="p")
-                    return [current_edge,next_edge]
-                else: return None
+                    return [current_edge, next_edge]
+                else:
+                    return None
 
         else:
             return None
@@ -200,6 +214,7 @@ class ExpTravelTimeRouter(BaseRouter):
     -----
     See based plz
     """
+
     def choose_route(self, env):
         """Notes:
         the difference of env.network & env.k.network
@@ -229,7 +244,7 @@ class ExpTravelTimeRouter(BaseRouter):
         start_edge = vehicle.get_edge(veh_id)
         velocity = max(5, vehicle.get_speed(veh_id))
 
-        def adding(next_edges_list,edge_name):  # adding the legal neighbour of current edge
+        def adding(next_edges_list, edge_name):  # adding the legal neighbour of current edge
             i, j = int(edge_name[-3]), int(edge_name[-1])
             edge_direction = edge_name[:-3]
             I, J = int(end_edge[-3]), int(end_edge[-1])
@@ -257,8 +272,8 @@ class ExpTravelTimeRouter(BaseRouter):
             i = int(current_edge[-3])
             j = int(current_edge[-1])  # get the index of current edge
             if edge_direction == "bot":
-                adding(next_edges,"right" + str(i + 1) + "_" + str(j))
-                adding(next_edges,edge_direction + str(i) + "_" + str(j + 1))
+                adding(next_edges, "right" + str(i + 1) + "_" + str(j))
+                adding(next_edges, edge_direction + str(i) + "_" + str(j + 1))
 
             if edge_direction == "right":
                 adding(next_edges, edge_direction + str(i + 1) + "_" + str(j))
@@ -301,7 +316,7 @@ class ExpTravelTimeRouter(BaseRouter):
         while s0 != []:
             s1_top = s1[-1]
 
-            if s1_top != []: # step2 keep build stacks
+            if s1_top != []:  # step2 keep build stacks
                 edge_to_s0 = s1_top.pop(0)
                 edgelist_to_s1 = _get_neigh_edges(edge_to_s0)
 
@@ -316,7 +331,7 @@ class ExpTravelTimeRouter(BaseRouter):
                 s1.pop()
                 continue
 
-            if s0[-1] == end_edge: # step4 get res
+            if s0[-1] == end_edge:  # step4 get res
                 res = copy.deepcopy(s0)
                 routes.append(res)
                 del res

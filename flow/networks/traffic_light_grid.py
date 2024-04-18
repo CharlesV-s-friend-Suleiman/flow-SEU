@@ -1015,7 +1015,7 @@ class SingleIntersectionNet(Network):
     def node_mapping(self):
         """Map nodes to edges.
         Returns a list of pairs (node, connected edges) of all inner nodes
-        and for each of them, the 4 edges that leave this node.
+        and for each of them, the 4 edges that enter this node.
 
         The nodes are listed in alphabetical order, and within that, edges are
         listed in order: [bot, right, top, left].
@@ -1030,6 +1030,31 @@ class SingleIntersectionNet(Network):
                 bot_edge_id = "right{}_{}".format(row, col)
                 right_edge_id = "top{}_{}".format(row, col + 1)
                 left_edge_id = "bot{}_{}".format(row, col)
+
+                mapping[node_id] = [left_edge_id, bot_edge_id,
+                                    right_edge_id, top_edge_id]
+
+        return sorted(mapping.items(), key=lambda x: x[0])
+
+    @property
+    def node_mapping_leave(self):
+        """Map nodes to edges.
+        Returns a list of pairs (node, connected edges) of all inner nodes
+        and for each of them, the 4 edges that leave this node.
+
+        The nodes are listed in alphabetical order, and within that, edges are
+        listed in order: [bot, right, top, left].
+        """
+        mapping = {}
+
+        for row in range(self.row_num):
+            for col in range(self.col_num):
+                node_id = "center{}".format(row * self.col_num + col)
+
+                top_edge_id = "right{}_{}".format(row + 1, col)
+                bot_edge_id = "left{}_{}".format(row, col)
+                right_edge_id = "bot{}_{}".format(row, col + 1)
+                left_edge_id = "top{}_{}".format(row, col)
 
                 mapping[node_id] = [left_edge_id, bot_edge_id,
                                     right_edge_id, top_edge_id]

@@ -185,7 +185,7 @@ class CoopEnv(Env):
         rv = average_rl_speed / max_speed
 
         if average_rl_speed - max_speed >= 5:
-            rv -= - 10
+            rv -=  10
 
         return rv
 
@@ -309,8 +309,6 @@ class CoopEnv(Env):
                 self.time_counter >= self.env_params.sims_per_step *
                 (self.env_params.warmup_steps + self.env_params.horizon) or
                 rl_collision or self.k.vehicle.num_rl_vehicles == 0)
-        if done:
-            print(self.time_counter, self.k.vehicle.num_rl_vehicles)
         # compute the info for each agent
         infos = {}
         # compute the reward

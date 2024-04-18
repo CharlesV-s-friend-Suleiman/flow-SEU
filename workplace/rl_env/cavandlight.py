@@ -3,7 +3,7 @@ environment for CAV and Traffic Light combined simulation
 using PPO algorithm
 """
 from flow.core.params import TrafficLightParams
-from flow.envs.multiagent import CustomEnv
+from flow.envs.multiagent.coopenv import CustomTryEnv
 from flow.controllers import GridRecycleRouter, ExpTravelTimeRouter, RLController
 from flow.core.params import SumoLaneChangeParams
 
@@ -22,7 +22,8 @@ from flow.core.params import SumoParams, EnvParams
 from flow.core.params import VehicleParams, SumoCarFollowingParams
 from flow.utils import inflow_methods
 
-
+HORIZON = 3000
+N_ROLLOUTS = 5
 USE_INFLOWS = True
 v_enter = 10
 inner_length = 500
@@ -34,6 +35,7 @@ num_cars_top = 1
 num_cars_bot = 1
 n_columns = 4
 n_rows = 3
+sim_step=0.1
 
 ADDITIONAL_NET_PARAMS = {
     # dictionary of traffic light grid array data
@@ -67,10 +69,9 @@ ADDITIONAL_NET_PARAMS = {
         "horizontal": 30,
         "vertical": 30
     },
-    "traffic_lights": True
+    "traffic_lights": True,
 }  # the net_params
-HORIZON = 3500
-N_ROLLOUTS = 8
+
 tot_cars = (num_cars_left + num_cars_right) * n_columns \
            + (num_cars_top + num_cars_bot) * n_rows
 
@@ -81,16 +82,17 @@ vehs.add(
     routing_controller=(GridRecycleRouter,{}),
     car_following_params=SumoCarFollowingParams(
         min_gap=2.5,
-        decel=7.5,
+        max_speed=30,
+        decel=3.5,
     ),
-    num_vehicles=tot_cars-1,
+    num_vehicles=tot_cars-2,
     color='white',
 )
 vehs.add(
     veh_id='cav',
     acceleration_controller=(RLController,{}),
     routing_controller=(ExpTravelTimeRouter,{}),
-    num_vehicles=1,
+    num_vehicles=2,
     color='red',
     lane_change_params=SumoLaneChangeParams(lane_change_mode="only_strategic_aggressive")
 )
@@ -108,7 +110,7 @@ else:
 flow_params = dict(
     # name of the experiment
     exp_tag="grid_0_{}x{}_multiagent".format(n_rows, n_columns),
-    env_name=CustomEnv,
+    env_name=CustomTryEnv,
     network=SingleIntersectionNet,
     simulator='traci',
     sim=SumoParams(
@@ -116,22 +118,23 @@ flow_params = dict(
         sim_step=0.1,
         render=False,
         emission_path='data',
+        print_warnings=False,
     ),
 
     env=EnvParams(
         horizon=HORIZON,
-        warmup_steps=0,
+        warmup_steps=50,
         evaluate=False,
         additional_params={
             "target_velocity": 30,
             "switch_time": 3.0,
-            "num_observed": 4,
+            "num_observed": 2,
             "discrete": True,
             "tl_type": "controlled",
             "num_local_edges": 4,
-            "num_local_lights": 4,
+            "num_local_lights": 0,
             "max_accel": 3,
-            "max_decel": 15,
+            "max_decel": 3,
         },
     ),
     net=net_params,
@@ -156,9 +159,9 @@ def setup_exps():
     agent_cls = get_agent_class(alg_run)
     config = agent_cls._default_config.copy()
     config["num_gpus"] = 1  # nums of gpu
-    config["num_workers"] = 8
+    config["num_workers"] = 10
     config["train_batch_size"] = HORIZON * N_ROLLOUTS
-    config["gamma"] = 0.99  # discount rate
+    config["gamma"] = 0.999  # discount rate
     config["model"].update({"fcnet_hiddens": [3, 3]})
     config["use_gae"] = True
     config["lambda"] = 0.97
@@ -185,7 +188,7 @@ def setup_exps():
     POLICY_GRAPHS = {'cav': (PPOTFPolicy, obs_space_av, act_space_av, {}),
                      'tl': (PPOTFPolicy, obs_space_tl, act_space_tl, {})}
     POLICY_TO_TRAIN = ['cav', 'tl']
-    POLICY_MAPPING_FN = ray.tune.function(lambda agent_id: 'cav' if agent_id.startswith('rl') else 'tl')
+    POLICY_MAPPING_FN = ray.tune.function(lambda agent_id: 'cav' if agent_id.startswith('cav') else 'tl')
 
     # multiagent configuration
 
@@ -197,7 +200,7 @@ def setup_exps():
 
 
 alg_run, gym_name, config = setup_exps()
-ray.init(num_cpus=10,num_gpus=1)
+ray.init(num_cpus=10+1,num_gpus=1)
 trials = run_experiments({
     flow_params["exp_tag"]: {
         "run": alg_run,
@@ -209,7 +212,7 @@ trials = run_experiments({
         "checkpoint_at_end": True,
         "max_failures": 999,
         "stop": {
-            "training_iteration": 100,
+            "training_iteration": 150,
         },
     }
 })
